@@ -34,15 +34,15 @@ api.interceptors.response.use(
   }
 );
 
-// ==================== TOPICS API ====================
+// ==================== TOPICS API (Public) ====================
 
 export const getTopics = async () => {
-  const response = await api.get('/api/admin/topics');
+  const response = await api.get('/api/topics');
   return response.data;
 };
 
 export const getTopic = async (topicId) => {
-  const response = await api.get(`/api/admin/topics/${topicId}`);
+  const response = await api.get(`/api/topics/${topicId}`);
   return response.data;
 };
 
