@@ -1,204 +1,107 @@
-# English Quiz Mobile App
+# English Quiz Mobile 📚
 
-A React Native Web application for learning English through AI-powered quizzes and chat. Works on web, iOS, and Android.
+A React Native (Expo) English learning app with AI-powered quizzes and chat tutor.
 
-![React Native](https://img.shields.io/badge/React_Native-0.74-blue)
-![Expo](https://img.shields.io/badge/Expo-51-black)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Parlo-inspired UI](https://img.shields.io/badge/UI-Parlo%20Inspired-FF6B6B)
+![Expo](https://img.shields.io/badge/Expo-SDK%2050-000020)
+![React Native](https://img.shields.io/badge/React%20Native-0.73-61DAFB)
 
-## Features
+## ✨ Features
 
-### 📝 Quiz Mode
-- AI-generated questions based on lesson content
-- Real-time scoring (0-5 per question)
-- Detailed feedback with grammar tips and examples
-- Progress tracking with grades (A-F)
-- Visual celebration on completion
+- 🎯 **Quiz Mode** - AI-generated questions with detailed feedback
+- 💬 **Chat Mode** - Interactive AI tutor for learning
+- 📊 **Progress Tracking** - View your learning history
+- 🎨 **Modern UI** - Clean, gamified design inspired by Parlo
 
-### 💬 Chat Mode  
-- Interactive AI English tutor
-- Context-aware responses based on selected topic
-- Real-time chat interface
-- Message history
+## 🚀 Quick Start
 
-### 📊 History
-- View all past quiz and chat sessions
-- Filter by mode (Quiz/Chat)
-- Expandable cards with full conversation details
-- Score tracking and performance metrics
+### Option 1: GitHub Codespaces (Recommended)
 
-## Screenshots
+1. Click the green **"Code"** button above
+2. Select **"Codespaces"** tab
+3. Click **"Create codespace on main"**
+4. Wait for setup to complete (~2 min)
+5. Run in terminal:
+   ```bash
+   npx expo start --web --tunnel
+   ```
+6. Click the URL that appears or use the forwarded port
 
-| Home | Quiz | Chat | History |
-|------|------|------|---------|
-| User ID entry | Question & feedback | AI tutor chat | Session history |
-
-## Tech Stack
-
-- **React Native** - Cross-platform mobile framework
-- **Expo** - Development and build tools
-- **React Navigation** - Navigation library
-- **Axios** - HTTP client
-- **AsyncStorage** - Local data persistence
-
-## Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Backend API running (see [english-quiz-api](https://github.com/macrobian88/english-quiz-api))
-
-## Installation
+### Option 2: Local Development
 
 ```bash
-# Clone the repository
+# Clone the repo
 git clone https://github.com/macrobian88/english-quiz-mobile.git
 cd english-quiz-mobile
 
 # Install dependencies
 npm install
 
-# Start the development server
-npx expo start
-```
-
-## Running the App
-
-```bash
-# Web
+# Start the app
 npx expo start --web
-
-# iOS Simulator
-npx expo start --ios
-
-# Android Emulator
-npx expo start --android
-
-# Scan QR code with Expo Go app for physical device
-npx expo start
 ```
 
-## Configuration
+## 📱 Running on Mobile
+
+1. Install **Expo Go** on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
+2. Run `npx expo start --tunnel`
+3. Scan the QR code with your phone
+
+## 🔧 Configuration
+
+### API URL
 
 Update the API base URL in `src/constants/config.js`:
 
 ```javascript
-export const API_BASE_URL = 'http://localhost:3000';
-// For production:
-// export const API_BASE_URL = 'https://your-api-domain.com';
+export const API_BASE_URL = 'http://localhost:3000'; // or your production URL
 ```
 
-## Project Structure
+### Backend Setup
+
+This app requires the [English Quiz API](https://github.com/macrobian88/english-quiz-api) backend. Make sure it's running before using the app.
+
+## 🎨 Design System
+
+The app uses a Parlo-inspired design system:
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Primary | `#FF6B6B` | Quiz actions, buttons |
+| Secondary | `#4ECDC4` | Chat actions, accents |
+| Accent | `#FFD93D` | Achievements, stars |
+| Background | `#F8F7F4` | Page backgrounds |
+| Card | `#FFFFFF` | Cards, modals |
+
+## 📂 Project Structure
 
 ```
-english-quiz-mobile/
-├── App.js                    # Main app entry with navigation
-├── app.json                  # Expo configuration
-├── package.json              # Dependencies
-├── src/
-│   ├── constants/
-│   │   └── config.js         # App configuration & colors
-│   ├── context/
-│   │   └── UserContext.js    # User ID state management
-│   ├── screens/
-│   │   ├── HomeScreen.js     # Landing page
-│   │   ├── QuizScreen.js     # Quiz mode
-│   │   ├── ChatScreen.js     # Chat mode
-│   │   └── HistoryScreen.js  # View history
-│   └── services/
-│       └── api.js            # API client
-└── assets/                   # Images & icons
+src/
+├── constants/
+│   └── config.js      # Colors, API URL, grades
+├── context/
+│   └── UserContext.js # User state management
+├── screens/
+│   ├── HomeScreen.js  # Landing page
+│   ├── QuizScreen.js  # Quiz flow
+│   ├── ChatScreen.js  # AI chat
+│   └── HistoryScreen.js # Progress history
+└── services/
+    └── api.js         # API client
 ```
 
-## API Endpoints Used
+## 🛠️ Tech Stack
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/admin/topics` | GET | List available topics |
-| `/api/quiz/start` | POST | Start a new quiz |
-| `/api/quiz/answer` | POST | Submit quiz answer |
-| `/api/quiz/status` | GET | Get quiz progress |
-| `/api/chat` | POST | Send chat message |
-| `/api/conversations` | GET | List user conversations |
-| `/api/conversations/:id` | GET | Get conversation details |
+- **Framework**: React Native + Expo SDK 50
+- **Navigation**: React Navigation
+- **HTTP Client**: Axios
+- **Storage**: AsyncStorage
+- **Icons**: Expo Vector Icons (Ionicons)
 
-## Usage
+## 📄 License
 
-### 1. Set User ID
-Enter any unique identifier on the home screen. This ID tracks your progress across sessions.
+MIT
 
-### 2. Start Quiz
-1. Select "Start Quiz"
-2. Choose a topic from the dropdown
-3. Set number of questions (1-10)
-4. Answer questions and receive instant feedback
-5. View final results with grade
+---
 
-### 3. Chat with Tutor
-1. Select "Chat with Tutor"
-2. Choose a topic
-3. Ask questions about the topic
-4. Receive AI-powered explanations
-
-### 4. View History
-1. Go to "View My History"
-2. Filter by All/Quiz/Chat
-3. Tap a session to see details
-4. Track your progress over time
-
-## Color Scheme
-
-| Score | Color | Meaning |
-|-------|-------|---------|
-| 5 | 🟢 Green | Perfect |
-| 4 | 🟢 Light Green | Great |
-| 3 | 🟡 Yellow | Good |
-| 1-2 | 🟠 Orange | Needs Work |
-| 0 | 🔴 Red | Incorrect |
-
-## Building for Production
-
-```bash
-# Web
-npx expo export:web
-
-# iOS/Android
-npx expo build:ios
-npx expo build:android
-
-# Using EAS Build
-eas build --platform all
-```
-
-## Troubleshooting
-
-### API Connection Issues
-- Ensure backend is running on correct port
-- Check API_BASE_URL in config.js
-- For physical devices, use your computer's local IP instead of localhost
-
-### Expo Issues
-```bash
-# Clear cache
-npx expo start -c
-
-# Reset dependencies
-rm -rf node_modules
-npm install
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
-## Related Projects
-
-- [english-quiz-api](https://github.com/macrobian88/english-quiz-api) - Backend API
-
-## License
-
-MIT License - see LICENSE file for details
+Built with ❤️ for English learners
