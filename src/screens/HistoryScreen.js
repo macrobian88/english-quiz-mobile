@@ -1,48 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Animated,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
-import { getConversations, getConversationDetails } from '../services/api';
-import { COLORS, getGradeInfo } from '../constants/config';
+import { getConversations } from '../services/api';
+import { COLORS, SHADOWS, getGradeInfo } from '../constants/config';
 
 export default function HistoryScreen({ navigation }) {
   const { userId } = useUser();
-  const [localUserId, setLocalUserId] = useState(userId || '');
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // 'all', 'quiz', 'chat'
-  const [expandedId, setExpandedId] = useState(null);
-  const [expandedDetails, setExpandedDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (localUserId) {
-      fetchConversations();
-    }
-  }, [localUserId]);
+    fetchConversations();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const fetchConversations = async () => {
-    if (!localUserId.trim()) return;
-    
     try {
       setLoading(true);
       setError(null);
-      const response = await getConversations(localUserId);
-      setConversations(response.conversations || []);
+      const response = await getConversations(userId);
+      setConversations(response.data || []);
     } catch (err) {
       setError(err.message);
-      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -54,241 +51,215 @@ export default function HistoryScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleLoadHistory = () => {
-    if (localUserId.trim()) {
-      fetchConversations();
-    }
-  };
-
-  const handleToggleExpand = async (conversation) => {
-    const id = `${conversation.topic_id}-${conversation.mode}`;
-    
-    if (expandedId === id) {
-      setExpandedId(null);
-      setExpandedDetails(null);
-      return;
-    }
-
-    setExpandedId(id);
-    setLoadingDetails(true);
-
-    try {
-      const response = await getConversationDetails(
-        localUserId,
-        conversation.topic_id,
-        conversation.mode
-      );
-      setExpandedDetails(response.conversation);
-    } catch (err) {
-      console.error('Error loading details:', err);
-      setExpandedDetails(null);
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
+  const filteredConversations = conversations.filter((conv) => {
+    if (activeFilter === 'all') return true;
+    return conv.mode === activeFilter;
+  });
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    return date.toLocaleDateString();
   };
 
-  const filteredConversations = conversations.filter((conv) => {
-    if (filter === 'all') return true;
-    return conv.mode === filter;
-  });
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed':
-        return COLORS.success;
-      case 'in_progress':
-        return COLORS.warning;
-      default:
-        return COLORS.textMuted;
-    }
+  const getQuizStats = (conv) => {
+    if (conv.mode !== 'quiz' || !conv.quiz_results) return null;
+    const results = conv.quiz_results;
+    return {
+      score: results.total_score || 0,
+      maxScore: results.max_possible_score || 0,
+      percentage: results.percentage || 0,
+      grade: results.grade || 'N/A',
+    };
   };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconContainer}>
+        <Text style={styles.emptyEmoji}>
+          {activeFilter === 'quiz' ? '📝' : activeFilter === 'chat' ? '💬' : '📚'}
+        </Text>
+      </View>
+      <Text style={styles.emptyTitle}>No History Yet</Text>
+      <Text style={styles.emptyText}>
+        {activeFilter === 'quiz'
+          ? 'Complete a quiz to see your results here'
+          : activeFilter === 'chat'
+          ? 'Start a chat session to see it here'
+          : 'Your learning activity will appear here'}
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={() => navigation.navigate(activeFilter === 'chat' ? 'Chat' : 'Quiz')}
+        activeOpacity={0.9}
+      >
+        <Text style={styles.emptyButtonText}>
+          {activeFilter === 'chat' ? 'Start Chatting' : 'Start a Quiz'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading your history...</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
-      }
-    >
-      {/* User ID Input */}
-      <View style={styles.inputCard}>
-        <Text style={styles.inputLabel}>User ID</Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your user ID"
-            placeholderTextColor={COLORS.textMuted}
-            value={localUserId}
-            onChangeText={setLocalUserId}
-            autoCapitalize="none"
-          />
-          <TouchableOpacity style={styles.loadButton} onPress={handleLoadHistory}>
-            <Ionicons name="search" size={20} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
-        {['all', 'quiz', 'chat'].map((filterOption) => (
-          <TouchableOpacity
-            key={filterOption}
-            style={[styles.filterTab, filter === filterOption && styles.filterTabActive]}
-            onPress={() => setFilter(filterOption)}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                filter === filterOption && styles.filterTabTextActive,
-              ]}
-            >
-              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Loading State */}
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading history...</Text>
-        </View>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={48} color={COLORS.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchConversations}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Empty State */}
-      {!loading && !error && filteredConversations.length === 0 && (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="time-outline" size={64} color={COLORS.textMuted} />
-          <Text style={styles.emptyTitle}>No History Found</Text>
-          <Text style={styles.emptyText}>
-            {localUserId
-              ? 'Start a quiz or chat to see your history here'
-              : 'Enter your user ID to load your history'}
+    <View style={styles.container}>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>My Progress</Text>
+          <Text style={styles.subtitle}>
+            {conversations.length} {conversations.length === 1 ? 'session' : 'sessions'}
           </Text>
         </View>
-      )}
 
-      {/* Conversations List */}
-      {!loading && filteredConversations.length > 0 && (
-        <View style={styles.listContainer}>
-          {filteredConversations.map((conversation, index) => {
-            const id = `${conversation.topic_id}-${conversation.mode}`;
-            const isExpanded = expandedId === id;
-            const percentage = conversation.max_possible_score
-              ? Math.round((conversation.total_score / conversation.max_possible_score) * 100)
-              : 0;
-            const gradeInfo = getGradeInfo(percentage);
-
-            return (
-              <TouchableOpacity
-                key={id + index}
-                style={styles.conversationCard}
-                onPress={() => handleToggleExpand(conversation)}
-                activeOpacity={0.7}
+        {/* Filter Tabs */}
+        <View style={styles.filterContainer}>
+          {['all', 'quiz', 'chat'].map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              style={[
+                styles.filterTab,
+                activeFilter === filter && styles.filterTabActive,
+              ]}
+              onPress={() => setActiveFilter(filter)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={
+                  filter === 'all'
+                    ? 'grid'
+                    : filter === 'quiz'
+                    ? 'school'
+                    : 'chatbubbles'
+                }
+                size={16}
+                color={activeFilter === filter ? '#fff' : COLORS.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.filterTabText,
+                  activeFilter === filter && styles.filterTabTextActive,
+                ]}
               >
-                {/* Card Header */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardTitleRow}>
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Error State */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={24} color={COLORS.error} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchConversations}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Conversations List */}
+        <ScrollView
+          style={styles.listContainer}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.primary}
+            />
+          }
+        >
+          {filteredConversations.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            filteredConversations.map((conv, index) => {
+              const stats = getQuizStats(conv);
+              const gradeInfo = stats ? getGradeInfo(stats.percentage) : null;
+              
+              return (
+                <TouchableOpacity
+                  key={conv._id || index}
+                  style={styles.conversationCard}
+                  activeOpacity={0.8}
+                >
+                  {/* Mode Badge */}
+                  <View style={styles.cardHeader}>
                     <View
                       style={[
                         styles.modeBadge,
-                        conversation.mode === 'quiz' ? styles.quizBadge : styles.chatBadge,
+                        conv.mode === 'quiz' ? styles.quizBadge : styles.chatBadge,
                       ]}
                     >
                       <Ionicons
-                        name={conversation.mode === 'quiz' ? 'school' : 'chatbubbles'}
+                        name={conv.mode === 'quiz' ? 'school' : 'chatbubbles'}
                         size={14}
-                        color={COLORS.text}
+                        color="#fff"
                       />
                       <Text style={styles.modeBadgeText}>
-                        {conversation.mode.toUpperCase()}
+                        {conv.mode === 'quiz' ? 'Quiz' : 'Chat'}
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(conversation.status) }]}>
-                      <Text style={styles.statusBadgeText}>{conversation.status}</Text>
-                    </View>
+                    <Text style={styles.dateText}>{formatDate(conv.updated_at)}</Text>
                   </View>
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={COLORS.textSecondary}
-                  />
-                </View>
 
-                {/* Topic ID */}
-                <Text style={styles.topicId}>{conversation.topic_id}</Text>
+                  {/* Topic */}
+                  <Text style={styles.topicText}>{conv.topic_id || 'Unknown Topic'}</Text>
 
-                {/* Quiz Score */}
-                {conversation.mode === 'quiz' && conversation.total_score !== undefined && (
-                  <View style={styles.scoreRow}>
-                    <Text style={styles.scoreLabel}>Score:</Text>
-                    <Text style={[styles.scoreValue, { color: gradeInfo.color }]}>
-                      {conversation.total_score}/{conversation.max_possible_score} ({percentage}%)
-                    </Text>
-                    <Text style={styles.gradeEmoji}>{gradeInfo.emoji}</Text>
-                  </View>
-                )}
-
-                {/* Date */}
-                <Text style={styles.dateText}>
-                  {formatDate(conversation.updated_at || conversation.created_at)}
-                </Text>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    {loadingDetails ? (
-                      <ActivityIndicator size="small" color={COLORS.primary} />
-                    ) : expandedDetails ? (
-                      <View style={styles.messagesPreview}>
-                        <Text style={styles.messagesTitle}>
-                          {expandedDetails.messages?.length || 0} Messages
-                        </Text>
-                        {expandedDetails.messages?.slice(-5).map((msg, idx) => (
-                          <View key={idx} style={styles.messagePreviewItem}>
-                            <Text style={styles.messageRole}>
-                              {msg.role === 'user' ? '👤' : '🤖'} {msg.role}:
-                            </Text>
-                            <Text style={styles.messagePreview} numberOfLines={2}>
-                              {msg.content}
-                            </Text>
-                            {msg.score !== undefined && (
-                              <Text style={styles.messageScore}>
-                                Score: {msg.score}/{msg.max_score}
-                              </Text>
-                            )}
-                          </View>
-                        ))}
+                  {/* Quiz Stats */}
+                  {stats && (
+                    <View style={styles.statsContainer}>
+                      <View style={styles.statItem}>
+                        <View style={[styles.gradeCircle, { backgroundColor: gradeInfo?.color || COLORS.textMuted }]}>
+                          <Text style={styles.gradeText}>{stats.grade}</Text>
+                        </View>
                       </View>
-                    ) : (
-                      <Text style={styles.noDetailsText}>No details available</Text>
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </ScrollView>
+                      <View style={styles.scoreContainer}>
+                        <Text style={styles.scoreLabel}>Score</Text>
+                        <Text style={styles.scoreValue}>
+                          {stats.score}/{stats.maxScore}
+                        </Text>
+                      </View>
+                      <View style={styles.percentContainer}>
+                        <Text style={styles.percentLabel}>Percentage</Text>
+                        <Text style={[styles.percentValue, { color: gradeInfo?.color }]}>
+                          {stats.percentage}%
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Chat Preview */}
+                  {conv.mode === 'chat' && (
+                    <View style={styles.chatPreview}>
+                      <Ionicons name="chatbubble-ellipses" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.chatPreviewText}>
+                        {conv.messages?.length || 0} messages
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -298,62 +269,58 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   content: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  
-  // Input Card
-  inputCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  input: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  loadButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingHorizontal: 16,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: COLORS.textSecondary,
+  },
+  
+  // Header
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
   
   // Filter Tabs
   filterContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 10,
   },
   filterTab: {
-    flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   filterTabActive: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   filterTabText: {
     fontSize: 14,
@@ -361,88 +328,63 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   filterTabTextActive: {
-    color: COLORS.text,
-  },
-  
-  // Loading
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.textSecondary,
+    color: '#fff',
   },
   
   // Error
   errorContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    padding: 24,
+    marginHorizontal: 20,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
   },
   errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.error,
+    color: COLORS.textSecondary,
+    marginVertical: 10,
     textAlign: 'center',
   },
   retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: COLORS.card,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
   },
-  retryButtonText: {
-    color: COLORS.primary,
+  retryText: {
+    color: '#fff',
     fontWeight: '600',
-  },
-  
-  // Empty
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
   },
   
   // List
   listContainer: {
-    gap: 12,
+    flex: 1,
   },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  
+  // Conversation Card
   conversationCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    ...SHADOWS.small,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    marginBottom: 12,
   },
   modeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 5,
   },
   quizBadge: {
     backgroundColor: COLORS.primary,
@@ -452,88 +394,125 @@ const styles = StyleSheet.create({
   },
   modeBadgeText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    color: COLORS.text,
     fontWeight: '600',
+    color: '#fff',
   },
-  topicId: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  dateText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  topicText: {
+    fontSize: 17,
+    fontWeight: '600',
     color: COLORS.text,
-    marginBottom: 8,
+    marginBottom: 14,
   },
-  scoreRow: {
+  
+  // Quiz Stats
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    padding: 14,
+    gap: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  gradeCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gradeText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  scoreContainer: {
+    flex: 1,
+  },
+  scoreLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginBottom: 2,
+  },
+  scoreValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  percentContainer: {
+    alignItems: 'flex-end',
+  },
+  percentLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginBottom: 2,
+  },
+  percentValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  
+  // Chat Preview
+  chatPreview: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
-  },
-  scoreLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  gradeEmoji: {
-    fontSize: 16,
-  },
-  dateText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-  },
-  
-  // Expanded
-  expandedContent: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  messagesPreview: {
-    gap: 12,
-  },
-  messagesTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  messagePreviewItem: {
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
     padding: 12,
   },
-  messageRole: {
-    fontSize: 12,
-    fontWeight: '600',
+  chatPreviewText: {
+    fontSize: 14,
     color: COLORS.textSecondary,
-    marginBottom: 4,
   },
-  messagePreview: {
-    fontSize: 14,
+  
+  // Empty State
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    ...SHADOWS.medium,
+  },
+  emptyEmoji: {
+    fontSize: 36,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: COLORS.text,
-    lineHeight: 20,
+    marginBottom: 8,
   },
-  messageScore: {
-    fontSize: 12,
-    color: COLORS.scoreGood,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  noDetailsText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
+  emptyText: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 40,
+  },
+  emptyButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+    ...SHADOWS.small,
+  },
+  emptyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

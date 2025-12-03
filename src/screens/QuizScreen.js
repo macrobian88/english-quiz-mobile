@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,15 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { getTopics, startQuiz, submitAnswer } from '../services/api';
-import { COLORS, APP_CONFIG, getScoreColor, getGradeInfo } from '../constants/config';
+import { COLORS, SHADOWS, APP_CONFIG, getScoreColor, getGradeInfo } from '../constants/config';
+
+const { width } = Dimensions.get('window');
 
 // Quiz States
 const STATES = {
@@ -45,10 +49,32 @@ export default function QuizScreen({ navigation }) {
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchTopics();
+    animateIn();
   }, []);
+
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const fetchTopics = async () => {
     try {
@@ -76,6 +102,7 @@ export default function QuizScreen({ navigation }) {
       setTotalQuestions(response.total_questions);
       setProgress({ current_score: 0, max_possible_score: 0 });
       setQuizState(STATES.QUESTION);
+      animateIn();
     } catch (err) {
       setError(err.message);
       setQuizState(STATES.SETUP);
@@ -102,11 +129,10 @@ export default function QuizScreen({ navigation }) {
       } else {
         setProgress(response.progress);
         setQuizState(STATES.FEEDBACK);
-        
-        // Store next question for after feedback
         setCurrentQuestion(response.next_question);
         setQuestionNumber(response.question_number);
       }
+      animateIn();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -122,6 +148,7 @@ export default function QuizScreen({ navigation }) {
       setEvaluation(null);
       setQuizState(STATES.QUESTION);
     }
+    animateIn();
   };
 
   const handleRestart = () => {
@@ -131,237 +158,313 @@ export default function QuizScreen({ navigation }) {
     setEvaluation(null);
     setFinalResults(null);
     setProgress({ current_score: 0, max_possible_score: 0 });
+    animateIn();
   };
 
   // Render Setup Screen
   const renderSetup = () => (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.setupCard}>
-        <Text style={styles.setupTitle}>Quiz Setup</Text>
-        
-        {/* Topic Selection */}
-        <Text style={styles.label}>Select Topic</Text>
-        <TouchableOpacity
-          style={styles.pickerButton}
-          onPress={() => setShowTopicPicker(true)}
-        >
-          <Ionicons name="book-outline" size={20} color={COLORS.textSecondary} />
-          <Text style={[styles.pickerText, !selectedTopic && styles.placeholder]}>
-            {selectedTopic ? selectedTopic.title : 'Choose a topic'}
-          </Text>
-          <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-        </TouchableOpacity>
-
-        {/* Question Count */}
-        <Text style={styles.label}>Number of Questions</Text>
-        <View style={styles.countContainer}>
-          <TouchableOpacity
-            style={styles.countButton}
-            onPress={() => setQuestionCount(Math.max(APP_CONFIG.minQuestionsCount, questionCount - 1))}
-          >
-            <Ionicons name="remove" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.countText}>{questionCount}</Text>
-          <TouchableOpacity
-            style={styles.countButton}
-            onPress={() => setQuestionCount(Math.min(APP_CONFIG.maxQuestionsCount, questionCount + 1))}
-          >
-            <Ionicons name="add" size={24} color={COLORS.text} />
-          </TouchableOpacity>
+      <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+        {/* Header */}
+        <View style={styles.setupHeader}>
+          <View style={styles.setupIconContainer}>
+            <Text style={styles.setupEmoji}>🎯</Text>
+          </View>
+          <Text style={styles.setupTitle}>Quiz Setup</Text>
+          <Text style={styles.setupSubtitle}>Choose your topic and get started!</Text>
         </View>
 
-        {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.startButton, !selectedTopic && styles.startButtonDisabled]}
-          onPress={handleStartQuiz}
-          disabled={!selectedTopic}
-        >
-          <Ionicons name="play" size={24} color={COLORS.text} />
-          <Text style={styles.startButtonText}>Start Quiz</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Topic Picker Modal */}
-      <Modal
-        visible={showTopicPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowTopicPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Topic</Text>
-              <TouchableOpacity onPress={() => setShowTopicPicker(false)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
-              </TouchableOpacity>
+        {/* Setup Card */}
+        <View style={styles.setupCard}>
+          {/* Topic Selection */}
+          <Text style={styles.label}>Select Topic</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setShowTopicPicker(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.pickerIconContainer}>
+              <Ionicons name="book" size={18} color={COLORS.primary} />
             </View>
-            <ScrollView style={styles.topicList}>
-              {topics.map((topic) => (
-                <TouchableOpacity
-                  key={topic.topic_id}
-                  style={[
-                    styles.topicItem,
-                    selectedTopic?.topic_id === topic.topic_id && styles.topicItemSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedTopic(topic);
-                    setShowTopicPicker(false);
-                  }}
-                >
-                  <Text style={styles.topicItemText}>{topic.title}</Text>
-                  {topic.metadata?.difficulty && (
-                    <View style={[styles.difficultyBadge, styles[`difficulty${topic.metadata.difficulty}`]]}>
-                      <Text style={styles.difficultyText}>{topic.metadata.difficulty}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <Text style={[styles.pickerText, !selectedTopic && styles.placeholder]}>
+              {selectedTopic ? selectedTopic.title : 'Choose a topic'}
+            </Text>
+            <View style={styles.pickerChevron}>
+              <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Question Count */}
+          <Text style={[styles.label, { marginTop: 24 }]}>Number of Questions</Text>
+          <View style={styles.countContainer}>
+            <TouchableOpacity
+              style={styles.countButton}
+              onPress={() => setQuestionCount(Math.max(APP_CONFIG.minQuestionsCount, questionCount - 1))}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="remove" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.countDisplay}>
+              <Text style={styles.countText}>{questionCount}</Text>
+              <Text style={styles.countLabel}>questions</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.countButton, styles.countButtonAdd]}
+              onPress={() => setQuestionCount(Math.min(APP_CONFIG.maxQuestionsCount, questionCount + 1))}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={22} color="#fff" />
+            </TouchableOpacity>
           </View>
+
+          {error && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.startButton, !selectedTopic && styles.startButtonDisabled]}
+            onPress={handleStartQuiz}
+            disabled={!selectedTopic}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.startButtonText}>Begin Quiz</Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
-      </Modal>
+
+        {/* Topic Picker Modal */}
+        <Modal
+          visible={showTopicPicker}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowTopicPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Topic</Text>
+                <TouchableOpacity 
+                  onPress={() => setShowTopicPicker(false)}
+                  style={styles.modalClose}
+                >
+                  <Ionicons name="close" size={22} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.topicList} showsVerticalScrollIndicator={false}>
+                {topics.map((topic, index) => (
+                  <TouchableOpacity
+                    key={topic.topic_id}
+                    style={[
+                      styles.topicItem,
+                      selectedTopic?.topic_id === topic.topic_id && styles.topicItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedTopic(topic);
+                      setShowTopicPicker(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.topicIcon, { backgroundColor: getTopicColor(index) }]}>
+                      <Text style={styles.topicIconText}>{topic.title.charAt(0)}</Text>
+                    </View>
+                    <View style={styles.topicInfo}>
+                      <Text style={styles.topicItemText}>{topic.title}</Text>
+                      {topic.metadata?.difficulty && (
+                        <Text style={styles.topicDifficulty}>{topic.metadata.difficulty}</Text>
+                      )}
+                    </View>
+                    {selectedTopic?.topic_id === topic.topic_id && (
+                      <View style={styles.topicCheck}>
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </Animated.View>
     </ScrollView>
   );
 
   // Render Loading Screen
   const renderLoading = () => (
     <View style={styles.centerContainer}>
-      <ActivityIndicator size="large" color={COLORS.primary} />
-      <Text style={styles.loadingText}>Preparing your quiz...</Text>
+      <View style={styles.loadingCard}>
+        <View style={styles.loadingIconContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+        <Text style={styles.loadingTitle}>Preparing Your Quiz</Text>
+        <Text style={styles.loadingText}>AI is crafting your questions...</Text>
+      </View>
     </View>
   );
 
   // Render Question Screen
   const renderQuestion = () => (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${((questionNumber - 1) / totalQuestions) * 100}%` },
-            ]}
-          />
+      <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+        {/* Progress Section */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressInfo}>
+            <Text style={styles.progressLabel}>Question</Text>
+            <Text style={styles.progressNumbers}>
+              <Text style={styles.currentNumber}>{questionNumber}</Text>
+              <Text style={styles.totalNumber}>/{totalQuestions}</Text>
+            </Text>
+          </View>
+          <View style={styles.scoreInfo}>
+            <Ionicons name="star" size={18} color={COLORS.accent} />
+            <Text style={styles.scoreInfoText}>{progress.current_score} pts</Text>
+          </View>
         </View>
-        <Text style={styles.progressText}>
-          Question {questionNumber} of {totalQuestions}
-        </Text>
-      </View>
 
-      {/* Score Display */}
-      <View style={styles.scoreDisplay}>
-        <Ionicons name="star" size={20} color={COLORS.scoreGood} />
-        <Text style={styles.scoreText}>
-          Score: {progress.current_score}/{progress.max_possible_score}
-        </Text>
-      </View>
-
-      {/* Question Card */}
-      <View style={styles.questionCard}>
-        <View style={styles.questionBadge}>
-          <Text style={styles.questionBadgeText}>Q{questionNumber}</Text>
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${((questionNumber - 1) / totalQuestions) * 100}%` },
+              ]}
+            />
+          </View>
         </View>
-        <Text style={styles.questionText}>{currentQuestion}</Text>
-      </View>
 
-      {/* Answer Input */}
-      <View style={styles.answerContainer}>
-        <Text style={styles.label}>Your Answer</Text>
-        <TextInput
-          style={styles.answerInput}
-          placeholder="Type your answer here..."
-          placeholderTextColor={COLORS.textMuted}
-          value={answer}
-          onChangeText={setAnswer}
-          multiline
-          numberOfLines={3}
-        />
-      </View>
-
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+        {/* Question Card */}
+        <View style={styles.questionCard}>
+          <View style={styles.questionBadge}>
+            <Text style={styles.questionBadgeText}>Q{questionNumber}</Text>
+          </View>
+          <Text style={styles.questionText}>{currentQuestion}</Text>
         </View>
-      )}
 
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-        onPress={handleSubmitAnswer}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color={COLORS.text} />
-        ) : (
-          <>
-            <Text style={styles.submitButtonText}>Submit Answer</Text>
-            <Ionicons name="send" size={20} color={COLORS.text} />
-          </>
+        {/* Answer Input */}
+        <View style={styles.answerSection}>
+          <Text style={styles.answerLabel}>Your Answer</Text>
+          <View style={styles.answerInputContainer}>
+            <TextInput
+              style={styles.answerInput}
+              placeholder="Type your answer here..."
+              placeholderTextColor={COLORS.textMuted}
+              value={answer}
+              onChangeText={setAnswer}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+        </View>
+
+        {error && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         )}
-      </TouchableOpacity>
+
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          onPress={handleSubmitAnswer}
+          disabled={loading}
+          activeOpacity={0.9}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.submitButtonText}>Submit Answer</Text>
+              <Ionicons name="send" size={18} color="#fff" />
+            </>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     </ScrollView>
   );
 
   // Render Feedback Screen
   const renderFeedback = () => {
     const scoreColor = getScoreColor(evaluation?.score || 0);
+    const score = evaluation?.score || 0;
     
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Score Badge */}
-        <View style={[styles.scoreBadge, { backgroundColor: scoreColor }]}>
-          <Text style={styles.scoreBadgeText}>{evaluation?.score || 0}/5</Text>
-        </View>
-
-        {/* Feedback Card */}
-        <View style={styles.feedbackCard}>
-          <Text style={styles.feedbackSummary}>
-            {evaluation?.feedback?.summary || 'Thanks for your answer!'}
-          </Text>
-          
-          <Text style={styles.feedbackExplanation}>
-            {evaluation?.feedback?.explanation || ''}
-          </Text>
-
-          {evaluation?.feedback?.correct_answer && (
-            <View style={styles.feedbackSection}>
-              <Text style={styles.feedbackLabel}>Correct Answer:</Text>
-              <Text style={styles.feedbackValue}>{evaluation.feedback.correct_answer}</Text>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+          {/* Score Display */}
+          <View style={styles.feedbackHeader}>
+            <View style={[styles.scoreBadge, { backgroundColor: scoreColor }]}>
+              <Text style={styles.scoreBadgeNumber}>{score}</Text>
+              <Text style={styles.scoreBadgeMax}>/5</Text>
             </View>
-          )}
+            <Text style={styles.feedbackTitle}>
+              {score === 5 ? 'Perfect! 🎉' : score >= 3 ? 'Good job! 👍' : 'Keep going! 💪'}
+            </Text>
+          </View>
 
-          {evaluation?.feedback?.grammar_tip && (
-            <View style={styles.feedbackSection}>
-              <View style={styles.feedbackTipHeader}>
-                <Ionicons name="bulb-outline" size={18} color={COLORS.scoreGood} />
-                <Text style={styles.feedbackLabel}>Grammar Tip:</Text>
+          {/* Feedback Card */}
+          <View style={styles.feedbackCard}>
+            {evaluation?.feedback?.summary && (
+              <Text style={styles.feedbackSummary}>{evaluation.feedback.summary}</Text>
+            )}
+            
+            {evaluation?.feedback?.explanation && (
+              <Text style={styles.feedbackExplanation}>{evaluation.feedback.explanation}</Text>
+            )}
+
+            {evaluation?.feedback?.correct_answer && (
+              <View style={styles.feedbackSection}>
+                <View style={styles.feedbackSectionHeader}>
+                  <View style={[styles.feedbackIcon, { backgroundColor: 'rgba(0, 184, 148, 0.1)' }]}>
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                  </View>
+                  <Text style={styles.feedbackLabel}>Correct Answer</Text>
+                </View>
+                <Text style={styles.feedbackValue}>{evaluation.feedback.correct_answer}</Text>
               </View>
-              <Text style={styles.feedbackValue}>{evaluation.feedback.grammar_tip}</Text>
-            </View>
-          )}
+            )}
 
-          {evaluation?.feedback?.example && (
-            <View style={styles.feedbackSection}>
-              <Text style={styles.feedbackLabel}>Example:</Text>
-              <Text style={styles.feedbackExample}>"{evaluation.feedback.example}"</Text>
-            </View>
-          )}
-        </View>
+            {evaluation?.feedback?.grammar_tip && (
+              <View style={styles.feedbackSection}>
+                <View style={styles.feedbackSectionHeader}>
+                  <View style={[styles.feedbackIcon, { backgroundColor: 'rgba(253, 203, 110, 0.1)' }]}>
+                    <Ionicons name="bulb" size={16} color={COLORS.accent} />
+                  </View>
+                  <Text style={styles.feedbackLabel}>Grammar Tip</Text>
+                </View>
+                <Text style={styles.feedbackValue}>{evaluation.feedback.grammar_tip}</Text>
+              </View>
+            )}
 
-        {/* Continue Button */}
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-          <Text style={styles.continueButtonText}>
-            {finalResults ? 'See Results' : 'Next Question'}
-          </Text>
-          <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
-        </TouchableOpacity>
+            {evaluation?.feedback?.example && (
+              <View style={styles.feedbackSection}>
+                <View style={styles.feedbackSectionHeader}>
+                  <View style={[styles.feedbackIcon, { backgroundColor: 'rgba(116, 185, 255, 0.1)' }]}>
+                    <Ionicons name="document-text" size={16} color={COLORS.info} />
+                  </View>
+                  <Text style={styles.feedbackLabel}>Example</Text>
+                </View>
+                <Text style={styles.feedbackExample}>"{evaluation.feedback.example}"</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Continue Button */}
+          <TouchableOpacity 
+            style={styles.continueButton} 
+            onPress={handleContinue}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.continueButtonText}>
+              {finalResults ? 'See Results' : 'Next Question'}
+            </Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
     );
   };
@@ -369,63 +472,97 @@ export default function QuizScreen({ navigation }) {
   // Render Results Screen
   const renderResults = () => {
     const gradeInfo = getGradeInfo(finalResults?.percentage || 0);
+    const percentage = finalResults?.percentage || 0;
     
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Celebration */}
-        <Text style={styles.celebrationEmoji}>{gradeInfo.emoji}</Text>
-        
-        {/* Grade Card */}
-        <View style={[styles.gradeCard, { borderColor: gradeInfo.color }]}>
-          <Text style={[styles.gradeText, { color: gradeInfo.color }]}>
-            Grade: {finalResults?.grade}
-          </Text>
-          <Text style={styles.gradeLabel}>{gradeInfo.label}</Text>
-        </View>
-
-        {/* Score Circle */}
-        <View style={styles.scoreCircle}>
-          <Text style={styles.scorePercentage}>{finalResults?.percentage || 0}%</Text>
-          <Text style={styles.scoreDetail}>
-            {finalResults?.total_score}/{finalResults?.max_possible_score}
-          </Text>
-        </View>
-
-        {/* Performance Stats */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Performance</Text>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Total Questions:</Text>
-            <Text style={styles.statValue}>{finalResults?.performance?.total_questions}</Text>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+          {/* Celebration Header */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.celebrationEmoji}>{gradeInfo.emoji}</Text>
+            <Text style={styles.resultsTitle}>{gradeInfo.label}</Text>
+            <Text style={styles.resultsSubtitle}>Quiz Completed!</Text>
           </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Perfect Answers:</Text>
-            <Text style={[styles.statValue, { color: COLORS.scorePerfect }]}>
-              {finalResults?.performance?.perfect_answers}
-            </Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Good Answers:</Text>
-            <Text style={[styles.statValue, { color: COLORS.scoreGreat }]}>
-              {finalResults?.performance?.good_answers}
-            </Text>
-          </View>
-        </View>
 
-        {/* Action Buttons */}
-        <View style={styles.resultActions}>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRestart}>
-            <Ionicons name="refresh" size={20} color={COLORS.primary} />
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.homeButton}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Ionicons name="home" size={20} color={COLORS.text} />
-            <Text style={styles.homeButtonText}>Home</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Score Circle */}
+          <View style={styles.scoreCircleContainer}>
+            <View style={[styles.scoreCircle, { borderColor: gradeInfo.color }]}>
+              <Text style={[styles.scorePercentage, { color: gradeInfo.color }]}>{percentage}%</Text>
+              <Text style={styles.gradeText}>Grade {finalResults?.grade}</Text>
+            </View>
+          </View>
+
+          {/* Stats Card */}
+          <View style={styles.statsCard}>
+            <Text style={styles.statsTitle}>Performance Summary</Text>
+            
+            <View style={styles.statRow}>
+              <View style={styles.statInfo}>
+                <View style={[styles.statIcon, { backgroundColor: 'rgba(78, 205, 196, 0.1)' }]}>
+                  <Ionicons name="help-circle" size={18} color={COLORS.secondary} />
+                </View>
+                <Text style={styles.statLabel}>Total Questions</Text>
+              </View>
+              <Text style={styles.statValue}>{finalResults?.performance?.total_questions}</Text>
+            </View>
+            
+            <View style={styles.statRow}>
+              <View style={styles.statInfo}>
+                <View style={[styles.statIcon, { backgroundColor: 'rgba(0, 184, 148, 0.1)' }]}>
+                  <Ionicons name="star" size={18} color={COLORS.scorePerfect} />
+                </View>
+                <Text style={styles.statLabel}>Perfect Answers</Text>
+              </View>
+              <Text style={[styles.statValue, { color: COLORS.scorePerfect }]}>
+                {finalResults?.performance?.perfect_answers}
+              </Text>
+            </View>
+            
+            <View style={styles.statRow}>
+              <View style={styles.statInfo}>
+                <View style={[styles.statIcon, { backgroundColor: 'rgba(85, 239, 196, 0.1)' }]}>
+                  <Ionicons name="thumbs-up" size={18} color={COLORS.scoreGreat} />
+                </View>
+                <Text style={styles.statLabel}>Good Answers</Text>
+              </View>
+              <Text style={[styles.statValue, { color: COLORS.scoreGreat }]}>
+                {finalResults?.performance?.good_answers}
+              </Text>
+            </View>
+
+            <View style={styles.statRow}>
+              <View style={styles.statInfo}>
+                <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 217, 61, 0.1)' }]}>
+                  <Ionicons name="trophy" size={18} color={COLORS.accent} />
+                </View>
+                <Text style={styles.statLabel}>Total Score</Text>
+              </View>
+              <Text style={styles.statValue}>
+                {finalResults?.total_score}/{finalResults?.max_possible_score}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.resultActions}>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={handleRestart}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={20} color={COLORS.primary} />
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.homeButton}
+              onPress={() => navigation.navigate('Home')}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="home" size={20} color="#fff" />
+              <Text style={styles.homeButtonText}>Home</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </ScrollView>
     );
   };
@@ -445,6 +582,18 @@ export default function QuizScreen({ navigation }) {
   }
 }
 
+const getTopicColor = (index) => {
+  const colors = [
+    'rgba(255, 107, 107, 0.15)',
+    'rgba(78, 205, 196, 0.15)',
+    'rgba(255, 217, 61, 0.15)',
+    'rgba(162, 155, 254, 0.15)',
+    'rgba(255, 159, 67, 0.15)',
+    'rgba(116, 185, 255, 0.15)',
+  ];
+  return colors[index % colors.length];
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -459,99 +608,151 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.textSecondary,
+    padding: 20,
   },
   
   // Setup styles
-  setupCard: {
+  setupHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  setupIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    ...SHADOWS.medium,
+  },
+  setupEmoji: {
+    fontSize: 36,
   },
   setupTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 24,
-    textAlign: 'center',
+    marginBottom: 6,
+  },
+  setupSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  setupCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    ...SHADOWS.medium,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textSecondary,
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   pickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 12,
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  pickerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   pickerText: {
     flex: 1,
-    marginLeft: 12,
     fontSize: 16,
     color: COLORS.text,
+    fontWeight: '500',
   },
   placeholder: {
     color: COLORS.textMuted,
+  },
+  pickerChevron: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: COLORS.backgroundDark,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   countContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
+    gap: 20,
+    paddingVertical: 8,
   },
   countButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...SHADOWS.small,
+  },
+  countButtonAdd: {
+    backgroundColor: COLORS.secondary,
+  },
+  countDisplay: {
+    alignItems: 'center',
+    minWidth: 80,
   },
   countText: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 40,
+    fontWeight: '700',
     color: COLORS.text,
-    minWidth: 60,
-    textAlign: 'center',
+  },
+  countLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: -4,
   },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     marginTop: 24,
-    gap: 8,
+    gap: 10,
+    ...SHADOWS.small,
   },
   startButtonDisabled: {
-    backgroundColor: COLORS.cardLight,
+    backgroundColor: COLORS.textMuted,
   },
   startButtonText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontWeight: '600',
+    color: '#fff',
   },
   errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 8,
-    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 12,
+    padding: 14,
     marginTop: 16,
+    gap: 10,
   },
   errorText: {
+    flex: 1,
     color: COLORS.error,
-    textAlign: 'center',
+    fontSize: 14,
   },
   
   // Modal styles
@@ -562,9 +763,18 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: COLORS.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '70%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '75%',
+    paddingBottom: 20,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -576,8 +786,16 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: COLORS.text,
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topicList: {
     padding: 16,
@@ -585,47 +803,127 @@ const styles = StyleSheet.create({
   topicItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: COLORS.backgroundLight,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   topicItemSelected: {
-    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    backgroundColor: 'rgba(255, 107, 107, 0.05)',
+  },
+  topicIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  topicIconText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  topicInfo: {
+    flex: 1,
   },
   topicItemText: {
     fontSize: 16,
-    color: COLORS.text,
-    flex: 1,
-  },
-  difficultyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  difficultybeginner: {
-    backgroundColor: COLORS.scorePerfect,
-  },
-  difficultyintermediate: {
-    backgroundColor: COLORS.scoreGood,
-  },
-  difficultyadvanced: {
-    backgroundColor: COLORS.scoreIncorrect,
-  },
-  difficultyText: {
-    fontSize: 12,
-    color: COLORS.text,
     fontWeight: '600',
+    color: COLORS.text,
+  },
+  topicDifficulty: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    textTransform: 'capitalize',
+  },
+  topicCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Loading styles
+  loadingCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 40,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    ...SHADOWS.medium,
+  },
+  loadingIconContainer: {
+    marginBottom: 20,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  loadingText: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
   },
   
   // Question styles
-  progressContainer: {
-    marginBottom: 20,
+  progressSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  progressLabel: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  progressNumbers: {
+    fontSize: 15,
+  },
+  currentNumber: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  totalNumber: {
+    fontSize: 16,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  scoreInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 217, 61, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 6,
+  },
+  scoreInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  progressBarContainer: {
+    marginBottom: 24,
   },
   progressBar: {
     height: 8,
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -634,128 +932,148 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 4,
   },
-  progressText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  scoreDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  scoreText: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
   questionCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 24,
-    marginBottom: 24,
+    marginBottom: 20,
+    ...SHADOWS.medium,
   },
   questionBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
     alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
     marginBottom: 16,
   },
   questionBadgeText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   questionText: {
     fontSize: 20,
+    fontWeight: '600',
     color: COLORS.text,
-    lineHeight: 28,
+    lineHeight: 30,
   },
-  answerContainer: {
+  answerSection: {
     marginBottom: 20,
   },
-  answerInput: {
+  answerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  answerInputContainer: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    ...SHADOWS.small,
+  },
+  answerInput: {
+    padding: 18,
     fontSize: 16,
     color: COLORS.text,
-    minHeight: 100,
+    minHeight: 120,
     textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
+    borderRadius: 16,
+    padding: 18,
+    gap: 10,
+    ...SHADOWS.small,
   },
   submitButtonDisabled: {
-    backgroundColor: COLORS.cardLight,
+    backgroundColor: COLORS.textMuted,
   },
   submitButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
   },
   
   // Feedback styles
-  scoreBadge: {
-    alignSelf: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 50,
+  feedbackHeader: {
+    alignItems: 'center',
     marginBottom: 24,
   },
-  scoreBadgeText: {
-    fontSize: 32,
-    fontWeight: 'bold',
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 20,
+    marginBottom: 16,
+    ...SHADOWS.medium,
+  },
+  scoreBadgeNumber: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  scoreBadgeMax: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  feedbackTitle: {
+    fontSize: 24,
+    fontWeight: '700',
     color: COLORS.text,
   },
   feedbackCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 24,
     marginBottom: 24,
+    ...SHADOWS.medium,
   },
   feedbackSummary: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: COLORS.text,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   feedbackExplanation: {
     fontSize: 16,
     color: COLORS.textSecondary,
     lineHeight: 24,
-    marginBottom: 16,
   },
   feedbackSection: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 20,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
-  feedbackTipHeader: {
+  feedbackSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
+    gap: 10,
+  },
+  feedbackIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   feedbackLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textSecondary,
-    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   feedbackValue: {
     fontSize: 16,
@@ -773,89 +1091,99 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
+    borderRadius: 16,
+    padding: 18,
+    gap: 10,
+    ...SHADOWS.small,
   },
   continueButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
   },
   
   // Results styles
-  celebrationEmoji: {
-    fontSize: 64,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  gradeCard: {
-    alignSelf: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 20,
-    borderRadius: 16,
-    borderWidth: 3,
-    backgroundColor: COLORS.card,
+  resultsHeader: {
+    alignItems: 'center',
     marginBottom: 24,
   },
-  gradeText: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  celebrationEmoji: {
+    fontSize: 64,
+    marginBottom: 12,
   },
-  gradeLabel: {
-    fontSize: 18,
+  resultsTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  resultsSubtitle: {
+    fontSize: 16,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 4,
+  },
+  scoreCircleContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
   },
   scoreCircle: {
-    alignSelf: 'center',
     width: 160,
     height: 160,
     borderRadius: 80,
     backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 4,
-    borderColor: COLORS.primary,
+    borderWidth: 6,
+    ...SHADOWS.medium,
   },
   scorePercentage: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontSize: 44,
+    fontWeight: '700',
   },
-  scoreDetail: {
+  gradeText: {
     fontSize: 16,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   statsCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     marginBottom: 24,
+    ...SHADOWS.medium,
   },
   statsTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    alignItems: 'center',
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  statInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   statLabel: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.textSecondary,
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: COLORS.text,
   },
   resultActions: {
@@ -868,10 +1196,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     gap: 8,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
   retryButtonText: {
@@ -885,13 +1213,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     gap: 8,
+    ...SHADOWS.small,
   },
   homeButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#fff',
   },
 });

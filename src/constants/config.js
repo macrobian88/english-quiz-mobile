@@ -8,57 +8,73 @@ export const APP_CONFIG = {
   minQuestionsCount: 1,
 };
 
-// Colors
+// Parlo-Inspired Color Palette
 export const COLORS = {
-  // Primary colors
-  primary: '#3B82F6',
-  primaryDark: '#2563EB',
-  secondary: '#10B981',
-  secondaryDark: '#059669',
+  // Primary colors - Warm and inviting
+  primary: '#FF6B6B',        // Warm coral
+  primaryDark: '#EE5A5A',
+  primaryLight: '#FF8E8E',
+  secondary: '#4ECDC4',      // Soft teal
+  secondaryDark: '#3DBDB5',
+  secondaryLight: '#7EDED7',
   
-  // Background colors
-  background: '#111827',
-  backgroundLight: '#1F2937',
-  card: '#374151',
-  cardLight: '#4B5563',
+  // Accent colors
+  accent: '#FFD93D',         // Golden yellow for achievements
+  accentOrange: '#FF9F43',
+  purple: '#A29BFE',
+  
+  // Background colors - Clean and light
+  background: '#F8F7F4',     // Warm off-white
+  backgroundLight: '#FFFFFF',
+  backgroundDark: '#F0EFEC',
+  card: '#FFFFFF',
+  cardHover: '#FAFAF9',
   
   // Text colors
-  text: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
+  text: '#2D3436',           // Deep charcoal
+  textSecondary: '#636E72',
+  textMuted: '#B2BEC3',
+  textLight: '#DFE6E9',
   
-  // Score colors
-  scorePerfect: '#10B981',    // Green (score 5)
-  scoreGreat: '#34D399',      // Light green (score 4)
-  scoreGood: '#FBBF24',       // Yellow (score 3)
-  scoreNeedsWork: '#F97316',  // Orange (score 1-2)
-  scoreIncorrect: '#EF4444', // Red (score 0)
+  // Score colors - More vibrant
+  scorePerfect: '#00B894',   // Emerald green
+  scoreGreat: '#55EFC4',     // Mint
+  scoreGood: '#FDCB6E',      // Honey
+  scoreNeedsWork: '#FF9F43', // Orange
+  scoreIncorrect: '#FF6B6B', // Coral
   
   // Chat bubble colors
-  userBubble: '#3B82F6',
-  botBubble: '#374151',
+  userBubble: '#FF6B6B',
+  botBubble: '#F0EFEC',
   
   // Status colors
-  success: '#10B981',
-  error: '#EF4444',
-  warning: '#F59E0B',
-  info: '#3B82F6',
+  success: '#00B894',
+  error: '#FF6B6B',
+  warning: '#FDCB6E',
+  info: '#74B9FF',
   
-  // Border colors
-  border: '#374151',
-  borderLight: '#4B5563',
+  // Border and shadow
+  border: '#E8E6E1',
+  borderLight: '#F0EFEC',
+  shadow: 'rgba(45, 52, 54, 0.08)',
+  shadowDark: 'rgba(45, 52, 54, 0.15)',
   
   // Transparent
-  overlay: 'rgba(0, 0, 0, 0.5)',
+  overlay: 'rgba(45, 52, 54, 0.5)',
+  overlayLight: 'rgba(45, 52, 54, 0.3)',
+  
+  // Gradient colors
+  gradientStart: '#FF6B6B',
+  gradientEnd: '#FF9F43',
 };
 
-// Grade Configuration
+// Grade Configuration with new colors
 export const GRADES = {
   A: { min: 90, emoji: '🎉', label: 'Excellent!', color: COLORS.scorePerfect },
-  B: { min: 80, emoji: '👍', label: 'Great job!', color: COLORS.scoreGreat },
-  C: { min: 70, emoji: '😊', label: 'Good work!', color: COLORS.scoreGood },
-  D: { min: 60, emoji: '💪', label: 'Keep practicing!', color: COLORS.scoreNeedsWork },
-  F: { min: 0, emoji: '📚', label: 'More practice needed', color: COLORS.scoreIncorrect },
+  B: { min: 80, emoji: '⭐', label: 'Great job!', color: COLORS.scoreGreat },
+  C: { min: 70, emoji: '👍', label: 'Good work!', color: COLORS.scoreGood },
+  D: { min: 60, emoji: '💪', label: 'Keep going!', color: COLORS.scoreNeedsWork },
+  F: { min: 0, emoji: '📚', label: 'Keep practicing!', color: COLORS.scoreIncorrect },
 };
 
 // Get score color based on score value (0-5)
@@ -77,4 +93,29 @@ export const getGradeInfo = (percentage) => {
   if (percentage >= 70) return GRADES.C;
   if (percentage >= 60) return GRADES.D;
   return GRADES.F;
+};
+
+// Shadow styles for different elevations
+export const SHADOWS = {
+  small: {
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  large: {
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
 };

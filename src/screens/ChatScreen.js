@@ -10,15 +10,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { getTopics, sendChatMessage } from '../services/api';
-import { COLORS } from '../constants/config';
+import { COLORS, SHADOWS } from '../constants/config';
 
 export default function ChatScreen({ navigation }) {
   const { userId } = useUser();
   const scrollViewRef = useRef(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Setup state
   const [topics, setTopics] = useState([]);
@@ -34,6 +36,11 @@ export default function ChatScreen({ navigation }) {
 
   useEffect(() => {
     fetchTopics();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const fetchTopics = async () => {
@@ -55,8 +62,7 @@ export default function ChatScreen({ navigation }) {
       {
         id: 'welcome',
         role: 'assistant',
-        content: `Hello! I'm your English tutor for "${selectedTopic.title}". Feel free to ask me any questions about this topic!`,
-        timestamp: new Date(),
+        content: `Hello! 👋 I'm your English tutor for "${selectedTopic.title}". Feel free to ask me anything about this topic!`,
       },
     ]);
   };
@@ -68,7 +74,6 @@ export default function ChatScreen({ navigation }) {
       id: Date.now().toString(),
       role: 'user',
       content: inputText.trim(),
-      timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -83,18 +88,15 @@ export default function ChatScreen({ navigation }) {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response.reply,
-        timestamp: new Date(),
       };
-
+      
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
       setError(err.message);
-      // Add error message to chat
       const errorMessage = {
         id: (Date.now() + 1).toString(),
-        role: 'system',
-        content: `Error: ${err.message}`,
-        timestamp: new Date(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
         isError: true,
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -103,116 +105,140 @@ export default function ChatScreen({ navigation }) {
     }
   };
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+  const handleEndChat = () => {
+    setIsSetup(true);
+    setMessages([]);
+    setSelectedTopic(null);
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const getTopicColor = (index) => {
+    const colors = [
+      'rgba(255, 107, 107, 0.15)',
+      'rgba(78, 205, 196, 0.15)',
+      'rgba(255, 217, 61, 0.15)',
+      'rgba(162, 155, 254, 0.15)',
+      'rgba(255, 159, 67, 0.15)',
+      'rgba(116, 185, 255, 0.15)',
+    ];
+    return colors[index % colors.length];
   };
 
   // Render Setup Screen
   if (isSetup) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.setupContent}>
-        <View style={styles.setupCard}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="chatbubbles" size={48} color={COLORS.secondary} />
-          </View>
-          <Text style={styles.setupTitle}>Chat with Tutor</Text>
-          <Text style={styles.setupSubtitle}>
-            Select a topic to start chatting with your AI English tutor
-          </Text>
-
-          {/* Topic Selection */}
-          <Text style={styles.label}>Select Topic</Text>
-          <TouchableOpacity
-            style={styles.pickerButton}
-            onPress={() => setShowTopicPicker(true)}
-          >
-            <Ionicons name="book-outline" size={20} color={COLORS.textSecondary} />
-            <Text style={[styles.pickerText, !selectedTopic && styles.placeholder]}>
-              {selectedTopic ? selectedTopic.title : 'Choose a topic'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-          </TouchableOpacity>
-
-          {error && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
+        <Animated.View style={{ opacity: fadeAnim }}>
+          {/* Header */}
+          <View style={styles.setupHeader}>
+            <View style={styles.setupIconContainer}>
+              <Text style={styles.setupEmoji}>💬</Text>
             </View>
-          )}
+            <Text style={styles.setupTitle}>Chat with Tutor</Text>
+            <Text style={styles.setupSubtitle}>Get answers to your questions</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.startButton, !selectedTopic && styles.startButtonDisabled]}
-            onPress={handleStartChat}
-            disabled={!selectedTopic}
-          >
-            <Ionicons name="chatbubble-ellipses" size={24} color={COLORS.text} />
-            <Text style={styles.startButtonText}>Start Chatting</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Topic Picker Modal */}
-        <Modal
-          visible={showTopicPicker}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowTopicPicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Topic</Text>
-                <TouchableOpacity onPress={() => setShowTopicPicker(false)}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
-                </TouchableOpacity>
+          {/* Setup Card */}
+          <View style={styles.setupCard}>
+            <Text style={styles.label}>Select Topic</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowTopicPicker(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.pickerIconContainer}>
+                <Ionicons name="book" size={18} color={COLORS.secondary} />
               </View>
-              <ScrollView style={styles.topicList}>
-                {topics.map((topic) => (
-                  <TouchableOpacity
-                    key={topic.topic_id}
-                    style={[
-                      styles.topicItem,
-                      selectedTopic?.topic_id === topic.topic_id && styles.topicItemSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedTopic(topic);
-                      setShowTopicPicker(false);
-                    }}
-                  >
-                    <Text style={styles.topicItemText}>{topic.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+              <Text style={[styles.pickerText, !selectedTopic && styles.placeholder]}>
+                {selectedTopic ? selectedTopic.title : 'Choose a topic'}
+              </Text>
+              <View style={styles.pickerChevron}>
+                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.startButton, !selectedTopic && styles.startButtonDisabled]}
+              onPress={handleStartChat}
+              disabled={!selectedTopic}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.startButtonText}>Start Chat</Text>
+              <Ionicons name="chatbubbles" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
-        </Modal>
+
+          {/* Topic Picker Modal */}
+          <Modal
+            visible={showTopicPicker}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowTopicPicker(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHandle} />
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Topic</Text>
+                  <TouchableOpacity 
+                    onPress={() => setShowTopicPicker(false)}
+                    style={styles.modalClose}
+                  >
+                    <Ionicons name="close" size={22} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.topicList} showsVerticalScrollIndicator={false}>
+                  {topics.map((topic, index) => (
+                    <TouchableOpacity
+                      key={topic.topic_id}
+                      style={[
+                        styles.topicItem,
+                        selectedTopic?.topic_id === topic.topic_id && styles.topicItemSelected,
+                      ]}
+                      onPress={() => {
+                        setSelectedTopic(topic);
+                        setShowTopicPicker(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.topicIcon, { backgroundColor: getTopicColor(index) }]}>
+                        <Text style={styles.topicIconText}>{topic.title.charAt(0)}</Text>
+                      </View>
+                      <View style={styles.topicInfo}>
+                        <Text style={styles.topicItemText}>{topic.title}</Text>
+                      </View>
+                      {selectedTopic?.topic_id === topic.topic_id && (
+                        <View style={[styles.topicCheck, { backgroundColor: COLORS.secondary }]}>
+                          <Ionicons name="checkmark" size={18} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+        </Animated.View>
       </ScrollView>
     );
   }
 
-  // Render Chat Screen
+  // Render Chat Interface
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView 
+      style={styles.chatContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
     >
       {/* Chat Header */}
       <View style={styles.chatHeader}>
-        <TouchableOpacity onPress={() => setIsSetup(true)} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+        <TouchableOpacity onPress={handleEndChat} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <View style={styles.chatHeaderInfo}>
           <Text style={styles.chatHeaderTitle}>{selectedTopic?.title}</Text>
-          <Text style={styles.chatHeaderSubtitle}>AI English Tutor</Text>
+          <Text style={styles.chatHeaderSubtitle}>AI Tutor</Text>
+        </View>
+        <View style={styles.onlineIndicator}>
+          <View style={styles.onlineDot} />
         </View>
       </View>
 
@@ -221,53 +247,54 @@ export default function ChatScreen({ navigation }) {
         ref={scrollViewRef}
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
-        onContentSizeChange={scrollToBottom}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        showsVerticalScrollIndicator={false}
       >
         {messages.map((message) => (
           <View
             key={message.id}
             style={[
-              styles.messageBubble,
-              message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-              message.isError && styles.errorBubble,
+              styles.messageWrapper,
+              message.role === 'user' ? styles.userMessageWrapper : styles.assistantMessageWrapper,
             ]}
           >
             {message.role === 'assistant' && (
               <View style={styles.avatarContainer}>
-                <Ionicons name="school" size={16} color={COLORS.secondary} />
+                <View style={styles.botAvatar}>
+                  <Text style={styles.botAvatarText}>🎓</Text>
+                </View>
               </View>
             )}
             <View
               style={[
-                styles.messageContent,
-                message.role === 'user' ? styles.userContent : styles.assistantContent,
+                styles.messageBubble,
+                message.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                message.isError && styles.errorBubble,
               ]}
             >
               <Text
                 style={[
                   styles.messageText,
-                  message.role === 'user' ? styles.userText : styles.assistantText,
-                  message.isError && styles.errorMessageText,
+                  message.role === 'user' ? styles.userMessageText : styles.assistantMessageText,
                 ]}
               >
                 {message.content}
               </Text>
-              <Text style={styles.messageTime}>{formatTime(message.timestamp)}</Text>
             </View>
           </View>
         ))}
         
         {sending && (
-          <View style={[styles.messageBubble, styles.assistantBubble]}>
+          <View style={styles.typingIndicator}>
             <View style={styles.avatarContainer}>
-              <Ionicons name="school" size={16} color={COLORS.secondary} />
-            </View>
-            <View style={[styles.messageContent, styles.assistantContent]}>
-              <View style={styles.typingIndicator}>
-                <View style={[styles.typingDot, styles.typingDot1]} />
-                <View style={[styles.typingDot, styles.typingDot2]} />
-                <View style={[styles.typingDot, styles.typingDot3]} />
+              <View style={styles.botAvatar}>
+                <Text style={styles.botAvatarText}>🎓</Text>
               </View>
+            </View>
+            <View style={styles.typingBubble}>
+              <View style={styles.typingDot} />
+              <View style={[styles.typingDot, styles.typingDotMiddle]} />
+              <View style={styles.typingDot} />
             </View>
           </View>
         )}
@@ -275,27 +302,25 @@ export default function ChatScreen({ navigation }) {
 
       {/* Input Area */}
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Ask a question..."
-          placeholderTextColor={COLORS.textMuted}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          maxLength={2000}
-          editable={!sending}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSendMessage}
-          disabled={!inputText.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={COLORS.text} />
-          ) : (
-            <Ionicons name="send" size={20} color={COLORS.text} />
-          )}
-        </TouchableOpacity>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type your message..."
+            placeholderTextColor={COLORS.textMuted}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={handleSendMessage}
+            disabled={!inputText.trim() || sending}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="send" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -306,92 +331,110 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
-  // Setup styles
   setupContent: {
     padding: 20,
-    flexGrow: 1,
-    justifyContent: 'center',
+    paddingBottom: 40,
   },
-  setupCard: {
+  chatContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  
+  // Setup styles
+  setupHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  setupIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 24,
-  },
-  iconContainer: {
-    alignSelf: 'center',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    ...SHADOWS.medium,
+  },
+  setupEmoji: {
+    fontSize: 36,
   },
   setupTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   setupSubtitle: {
     fontSize: 16,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
+  },
+  setupCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    ...SHADOWS.medium,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textSecondary,
-    marginBottom: 8,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   pickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 12,
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  pickerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(78, 205, 196, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   pickerText: {
     flex: 1,
-    marginLeft: 12,
     fontSize: 16,
     color: COLORS.text,
+    fontWeight: '500',
   },
   placeholder: {
     color: COLORS.textMuted,
   },
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  pickerChevron: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-  },
-  errorText: {
-    color: COLORS.error,
-    textAlign: 'center',
+    backgroundColor: COLORS.backgroundDark,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.secondary,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     marginTop: 24,
-    gap: 8,
+    gap: 10,
+    ...SHADOWS.small,
   },
   startButtonDisabled: {
-    backgroundColor: COLORS.cardLight,
+    backgroundColor: COLORS.textMuted,
   },
   startButtonText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontWeight: '600',
+    color: '#fff',
   },
   
   // Modal styles
@@ -402,9 +445,18 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: COLORS.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '70%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '75%',
+    paddingBottom: 20,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -416,152 +468,224 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: COLORS.text,
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topicList: {
     padding: 16,
   },
   topicItem: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: COLORS.backgroundLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   topicItemSelected: {
-    backgroundColor: COLORS.secondary,
+    borderColor: COLORS.secondary,
+    backgroundColor: 'rgba(78, 205, 196, 0.05)',
+  },
+  topicIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  topicIconText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  topicInfo: {
+    flex: 1,
   },
   topicItemText: {
     fontSize: 16,
+    fontWeight: '600',
     color: COLORS.text,
   },
+  topicCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   
-  // Chat styles
+  // Chat header
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
     backgroundColor: COLORS.card,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    ...SHADOWS.small,
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   chatHeaderInfo: {
     flex: 1,
   },
   chatHeaderTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
     color: COLORS.text,
   },
   chatHeaderSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textSecondary,
   },
+  onlineIndicator: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 184, 148, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  onlineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.success,
+  },
+  
+  // Messages
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
-  messageBubble: {
+  messageWrapper: {
     flexDirection: 'row',
     marginBottom: 16,
   },
-  userBubble: {
+  userMessageWrapper: {
     justifyContent: 'flex-end',
   },
-  assistantBubble: {
+  assistantMessageWrapper: {
     justifyContent: 'flex-start',
   },
-  errorBubble: {
-    justifyContent: 'center',
-  },
   avatarContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    marginRight: 10,
+  },
+  botAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    ...SHADOWS.small,
   },
-  messageContent: {
-    maxWidth: '80%',
-    borderRadius: 16,
-    padding: 12,
+  botAvatarText: {
+    fontSize: 18,
   },
-  userContent: {
-    backgroundColor: COLORS.userBubble,
-    borderBottomRightRadius: 4,
-    marginLeft: 'auto',
+  messageBubble: {
+    maxWidth: '75%',
+    borderRadius: 20,
+    padding: 14,
+    paddingHorizontal: 18,
   },
-  assistantContent: {
-    backgroundColor: COLORS.botBubble,
-    borderBottomLeftRadius: 4,
+  userBubble: {
+    backgroundColor: COLORS.primary,
+    borderBottomRightRadius: 6,
+  },
+  assistantBubble: {
+    backgroundColor: COLORS.card,
+    borderBottomLeftRadius: 6,
+    ...SHADOWS.small,
+  },
+  errorBubble: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
   },
   messageText: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 22,
   },
-  userText: {
+  userMessageText: {
+    color: '#fff',
+  },
+  assistantMessageText: {
     color: COLORS.text,
   },
-  assistantText: {
-    color: COLORS.text,
-  },
-  errorMessageText: {
-    color: COLORS.error,
-  },
-  messageTime: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 4,
-    textAlign: 'right',
-  },
+  
+  // Typing indicator
   typingIndicator: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    marginBottom: 16,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
+    padding: 14,
+    paddingHorizontal: 18,
     gap: 4,
-    padding: 4,
+    ...SHADOWS.small,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.textMuted,
-  },
-  typingDot1: {
-    opacity: 0.4,
-  },
-  typingDot2: {
     opacity: 0.6,
   },
-  typingDot3: {
+  typingDotMiddle: {
     opacity: 0.8,
   },
+  
+  // Input
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
     backgroundColor: COLORS.card,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    gap: 8,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: COLORS.background,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 6,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   textInput: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     fontSize: 16,
     color: COLORS.text,
     maxHeight: 100,
+    paddingVertical: 10,
   },
   sendButton: {
     width: 44,
@@ -572,6 +696,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: COLORS.cardLight,
+    backgroundColor: COLORS.textMuted,
   },
 });
