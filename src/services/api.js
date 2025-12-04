@@ -25,6 +25,7 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
+    console.log('[API] Response:', JSON.stringify(response.data, null, 2).substring(0, 500));
     return response;
   },
   (error) => {
@@ -90,7 +91,28 @@ export const getConversations = async (userId) => {
   const response = await api.get('/api/conversations', {
     params: { user_id: userId },
   });
-  return response.data;
+  
+  // Handle different response formats from backend
+  const data = response.data;
+  
+  // If data is already an array, return it wrapped
+  if (Array.isArray(data)) {
+    return { conversations: data };
+  }
+  
+  // If data has conversations array
+  if (data.conversations) {
+    return { conversations: data.conversations };
+  }
+  
+  // If data has data array
+  if (data.data) {
+    return { conversations: data.data };
+  }
+  
+  // Fallback - return empty array
+  console.warn('[API] Unexpected conversations response format:', data);
+  return { conversations: [] };
 };
 
 export const getConversationDetails = async (userId, topicId, mode) => {

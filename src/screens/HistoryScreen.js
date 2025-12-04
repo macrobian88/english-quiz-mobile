@@ -36,9 +36,18 @@ export default function HistoryScreen({ navigation }) {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('[History] Fetching conversations for user:', userId);
       const response = await getConversations(userId);
-      setConversations(response.data || []);
+      console.log('[History] Response:', JSON.stringify(response, null, 2).substring(0, 1000));
+      
+      // The API service now always returns { conversations: [...] }
+      const convs = response.conversations || [];
+      console.log('[History] Conversations count:', convs.length);
+      
+      setConversations(convs);
     } catch (err) {
+      console.error('[History] Error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -56,8 +65,15 @@ export default function HistoryScreen({ navigation }) {
     return conv.mode === activeFilter;
   });
 
-  const formatDate = (dateString) => {
+  const formatDate = (conv) => {
+    // Try different date field names
+    const dateString = conv.updated_at || conv.updatedAt || conv.created_at || conv.createdAt;
+    
+    if (!dateString) return 'Unknown date';
+    
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Unknown date';
+    
     const now = new Date();
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -69,14 +85,41 @@ export default function HistoryScreen({ navigation }) {
   };
 
   const getQuizStats = (conv) => {
-    if (conv.mode !== 'quiz' || !conv.quiz_results) return null;
-    const results = conv.quiz_results;
+    if (conv.mode !== 'quiz') return null;
+    
+    // Try different field names for quiz results
+    const results = conv.quiz_results || conv.final_results || conv.results;
+    
+    if (!results) {
+      console.log('[History] No quiz results found for:', conv._id || conv.id);
+      return null;
+    }
+    
     return {
-      score: results.total_score || 0,
-      maxScore: results.max_possible_score || 0,
+      score: results.total_score || results.totalScore || 0,
+      maxScore: results.max_possible_score || results.maxPossibleScore || results.maxScore || 0,
       percentage: results.percentage || 0,
       grade: results.grade || 'N/A',
     };
+  };
+
+  const getTopicTitle = (conv) => {
+    // Try different field names
+    return conv.topic_title || conv.topicTitle || conv.topic_id || conv.topicId || 'Unknown Topic';
+  };
+
+  const getMessageCount = (conv) => {
+    // Try different field names
+    if (conv.messages && Array.isArray(conv.messages)) {
+      return conv.messages.length;
+    }
+    if (conv.message_count !== undefined) {
+      return conv.message_count;
+    }
+    if (conv.messageCount !== undefined) {
+      return conv.messageCount;
+    }
+    return 0;
   };
 
   const renderEmptyState = () => (
@@ -194,7 +237,7 @@ export default function HistoryScreen({ navigation }) {
               
               return (
                 <TouchableOpacity
-                  key={conv._id || index}
+                  key={conv._id || conv.id || index}
                   style={styles.conversationCard}
                   activeOpacity={0.8}
                 >
@@ -215,11 +258,11 @@ export default function HistoryScreen({ navigation }) {
                         {conv.mode === 'quiz' ? 'Quiz' : 'Chat'}
                       </Text>
                     </View>
-                    <Text style={styles.dateText}>{formatDate(conv.updated_at)}</Text>
+                    <Text style={styles.dateText}>{formatDate(conv)}</Text>
                   </View>
 
                   {/* Topic */}
-                  <Text style={styles.topicText}>{conv.topic_id || 'Unknown Topic'}</Text>
+                  <Text style={styles.topicText}>{getTopicTitle(conv)}</Text>
 
                   {/* Quiz Stats */}
                   {stats && (
@@ -249,7 +292,7 @@ export default function HistoryScreen({ navigation }) {
                     <View style={styles.chatPreview}>
                       <Ionicons name="chatbubble-ellipses" size={16} color={COLORS.textMuted} />
                       <Text style={styles.chatPreviewText}>
-                        {conv.messages?.length || 0} messages
+                        {getMessageCount(conv)} messages
                       </Text>
                     </View>
                   )}
